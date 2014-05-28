@@ -154,7 +154,7 @@ void EqualizerDisplaySystem::generateEqConfig()
 				winY = tc.position[1] + eqcfg.windowOffset[1];
 			
 				String tileName = tc.name;
-				String tileCfg = buildTileConfig(indent, tileName, winX, winY, tc.pixelSize[0], tc.pixelSize[1], tc.device, curDevice, eqcfg.fullscreen, tc.borderless);
+				String tileCfg = buildTileConfig(indent, tileName, winX, winY, tc.pixelSize[0], tc.pixelSize[1], tc.device, curDevice, eqcfg.fullscreen, tc.borderless, tc.offscreen);
 				result += tileCfg;
 
 				curDevice = tc.device;
@@ -182,7 +182,7 @@ void EqualizerDisplaySystem::generateEqConfig()
 			if(eqcfg.enableSwapSync)
 			{
 				//String tileCfg = ostr("\t\tcompound { swapbarrier { name \"defaultbarrier\" } channel ( canvas \"canvas-%1%\" segment \"segment-%2%\" layout \"layout-%3%\" view \"view-%4%\" ) }\n",
-				String tileCfg = ostr("\t\tcompound { swapbarrier { name \"defaultbarrier\" } channel \"%1%\"\n",	%tc->name);
+				String tileCfg = ostr("\t\tcompound { swapbarrier { name \"defaultbarrier\" } channel \"%1%\" task [DRAW]\n",	%tc->name);
 				START_BLOCK(tileCfg, "wall");
 				tileCfg +=
 					L("bottom_left [ -1 -0.5 0 ]") +
@@ -193,7 +193,7 @@ void EqualizerDisplaySystem::generateEqConfig()
 			}
 			else
 			{
-				String tileCfg = ostr("\t\tchannel \"%1%\"\n", %tc->name);
+				String tileCfg = ostr("\t\tchannel \"%1%\" task [DRAW]\n", %tc->name);
 				START_BLOCK(tileCfg, "wall");
 				tileCfg +=
 					L("bottom_left [ -1 -0.5 0 ]") +
@@ -223,7 +223,7 @@ void EqualizerDisplaySystem::generateEqConfig()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-String EqualizerDisplaySystem::buildTileConfig(String& indent, const String tileName, int x, int y, int width, int height, int device, int curdevice, bool fullscreen, bool borderless)
+String EqualizerDisplaySystem::buildTileConfig(String& indent, const String tileName, int x, int y, int width, int height, int device, int curdevice, bool fullscreen, bool borderless, bool offscreen)
 {
 	String viewport = ostr("viewport [%1% %2% %3% %4%]", %x %y %width %height);
 
@@ -259,6 +259,13 @@ String EqualizerDisplaySystem::buildTileConfig(String& indent, const String tile
 			L("hint_decoration OFF");
 		END_BLOCK(tileCfg);
 	}
+    else if(offscreen)
+    {
+        START_BLOCK(tileCfg, "attributes");
+        tileCfg +=
+            L("hint_drawable FBO");
+        END_BLOCK(tileCfg);
+    }
 	END_BLOCK(tileCfg)
 	return tileCfg;
 }

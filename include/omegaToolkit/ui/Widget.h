@@ -43,6 +43,7 @@ namespace omegaToolkit {
     class UiScriptCommand;
     namespace ui {
     class Container;
+    class WidgetFactory;
     ///////////////////////////////////////////////////////////////////////////
     class OTK_API Widget: public RenderableFactory, IEventListener
     {
@@ -54,6 +55,15 @@ namespace omegaToolkit {
         enum Layer { Back, Middle, Front, NumLayers };
         enum BlendMode { BlendInherit, BlendNormal, BlendAdditive, BlendDisabled };
         static const int MaxWidgets = 16384;
+
+        // Border style data
+        struct BorderStyle
+        {
+            void fromString(const String& str);
+
+            Color color;
+            int width;
+        };
 
     public:
         Widget(Engine* server);
@@ -135,6 +145,7 @@ namespace omegaToolkit {
         //! Returns true if this widget is part of a container that will be drawn
         //! in 3D mode.
         virtual bool isIn3DContainer();
+        bool isPointerInside() { return myPointerInside; }
         //@}
 
         //! Returns the unique Widget id.
@@ -181,6 +192,13 @@ namespace omegaToolkit {
         BlendMode getBlendMode() { return myBlendMode; }
         void setFillColor(const Color& c) { myFillColor = c; }
         void setFillEnabled(bool value) { myFillEnabled = value; }
+        //! Gets the style for one of the borders
+        //! @remarks valid values for side are:
+        //! 0 - for top
+        //! 1 - for right
+        //! 2 - for bottom
+        //! 3 - for left
+        BorderStyle& getBorderStyle(int side) { return myBorders[side]; }
         //! Enables or disables shaders for this widget. Shaders are enabled
         //! by default and are required to correctly render some widget features
         //! like correct transparency. The shader used by the widget can be 
@@ -220,6 +238,13 @@ namespace omegaToolkit {
         bool isPinned() { return myPinned; }
         void setPinned(bool value) { myPinned = value; }
 
+        void setSizeAnchorEnabled(bool enabled) { mySizeAnchorEnabled = enabled; }
+        bool isSizeAnchorEnabled() { return mySizeAnchorEnabled; }
+        void setSizeAnchor(const Vector2f& value) { mySizeAnchor = value; }
+        const Vector2f getSizeAnchor() { return mySizeAnchor; }
+
+        WidgetFactory* getFactory();
+
         //! Debug mode
         //@{
         //! Gets the color used when widget debug mode is enabled.
@@ -231,13 +256,19 @@ namespace omegaToolkit {
         //! Enabled or disabled debug mode for this widget.
         //! When debug mode is enabled, the widget bounding box will be displayed.
         void setDebugModeEnabled(bool value) { myDebugModeEnabled = value; }
-
         //@}
+
     protected:
         bool simpleHitTest(const omega::Vector2f& point);
         static bool simpleHitTest(const omega::Vector2f& point, const omega::Vector2f& pos, const omega::Vector2f& size);
 
+        //! Called when this widget becomes the active widget. 
+        //! Derivec classes can implement this method to specify a custom 
+        //! activation behavior
         virtual void activate() {}
+        //! Called when this widget is not the active widget anymore. 
+        //! Derivec classes can implement this method to specify a custom 
+        //! deactivation behavior
         virtual void deactivate() {}
         virtual void updateStyle();
 
@@ -294,6 +325,10 @@ namespace omegaToolkit {
         omega::Color myDebugModeColor;
 
         bool myPinned;
+
+        bool mySizeAnchorEnabled;
+        omega::Vector2f mySizeAnchor;
+
         bool myDraggable;
         bool myDragging;
         omega::Vector2f myUserMovePosition;
@@ -306,6 +341,8 @@ namespace omegaToolkit {
         bool myActive;
         // When true, the widget takes part in navigation
         bool myNavigationEnabled;
+        // When true, a pointer is over this widget area.
+        bool myPointerInside;
 
         // Size constraints.
         omega::Vector2f myMinimumSize;
@@ -323,15 +360,6 @@ namespace omegaToolkit {
         // Fill style data
         bool myFillEnabled;
         Color myFillColor;
-
-        // Border style data
-        struct BorderStyle
-        {
-            void fromString(const String& str);
-
-            Color color;
-            int width;
-        };
 
         // Shader data
         bool myShaderEnabled;
@@ -540,14 +568,19 @@ namespace omegaToolkit {
         {
             if(myContainer != NULL)
             {
-                ((Widget*)myContainer)->setPosition(
-                    ((Widget*)myContainer)->getPosition() + 
-                    value - myPosition);
+                Vector2f pos = ((Widget*)myContainer)->getPosition() +
+                    value - myPosition;
+
+                // se the alternative setPosition method because we do not
+                // want the layout to be refreshed upon this call.
+                ((Widget*)myContainer)->setPosition(pos[0], Horizontal);
+                ((Widget*)myContainer)->setPosition(pos[1], Vertical);
             }
         }
         else 
         {
             myPosition = value; 
+            requestLayoutRefresh();
         }
     }
 

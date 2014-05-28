@@ -37,6 +37,7 @@
 
 // Display system
 #include "omega/DisplaySystem.h"
+#include "omega/NullDisplaySystem.h"
 #include "omega/ObserverUpdateServiceExt.h"
 #include "omega/ViewRayService.h"
 #include "omega/WandEmulationService.h"
@@ -158,7 +159,7 @@ void SystemManager::setupRemote(Config* cfg, const String& hostname)
 ///////////////////////////////////////////////////////////////////////////////
 void SystemManager::setup(Config* appcfg)
 {
-    omsg("SystemManager::setup");
+    //omsg("SystemManager::setup");
 
     setupConfig(appcfg);
     try
@@ -187,15 +188,15 @@ void SystemManager::setup(Config* appcfg)
         // services.
         myServiceManager = new ServiceManager();
 
-        // NOTE: We initialize the interpreter here (instead of the 
-        // SystemManager::initialize function) to allow it to load optional modules
-        // that may provide services that we then want do setup during
-        // setupServiceManager() or setupDisplaySystem()
-        myInterpreter->initialize("omegalib");
-
         // The display system needs to be set up before service manager, because it finishes setting up
         // the multi instance configuration parameters that are used during service configuration.
         setupDisplaySystem();
+
+        // NOTE: We initialize the interpreter here (instead of the 
+        // SystemManager::initialize function) to allow it to load optional modules
+        // that may provide services that we then want do setup during
+        // setupServiceManager()
+        myInterpreter->initialize("omegalib");
 
         setupServiceManager();
     }
@@ -215,7 +216,7 @@ void SystemManager::setupConfig(Config* appcfg)
     myAppConfig = appcfg;
     if(appcfg->exists("config/systemConfig"))
     {
-        String systemCfgName = appcfg->lookup("config/systemConfig");
+        String systemCfgName = (const char*)appcfg->lookup("config/systemConfig");
         // If system config specified 'DEFAULT', open default.cfg and read the system
         // config entry there.
         // LOGIC CHANGE: 13Jul2013
@@ -227,7 +228,7 @@ void SystemManager::setupConfig(Config* appcfg)
             Config* defaultCfg = new Config("default.cfg");
             if(defaultCfg->load())
             {
-                String systemCfgName = defaultCfg->lookup("config/systemConfig");
+                String systemCfgName = (const char*)defaultCfg->lookup("config/systemConfig");
                 mySystemConfig = new Config(systemCfgName);
             }
             else
@@ -314,13 +315,12 @@ void SystemManager::setupServiceManager()
 ///////////////////////////////////////////////////////////////////////////////
 void SystemManager::setupDisplaySystem()
 {
-    // Instantiate input services
     if(mySystemConfig->exists("config/display"))
     {
         Setting& stDS = mySystemConfig->lookup("config/display");
         DisplaySystem* ds = NULL;
 
-        String displaySystemType;
+        String displaySystemType = "Null";
         stDS.lookupValue("type", displaySystemType);
         
         ofmsg("SystemManager::setupDisplaySystem: type = %1%", %displaySystemType);
@@ -343,8 +343,11 @@ void SystemManager::setupDisplaySystem()
         }
         else
         {
-            oferror("invalid display system type: %s", %displaySystemType);
+            // if display is unspecified incorrect or specified as 'Null'
+            // setup the application in headless node.
+            ds = new NullDisplaySystem();
         }
+
         if(ds != NULL)
         {
             // Setup the display system. This call will parse the display configuration and fill
@@ -360,6 +363,12 @@ void SystemManager::setupDisplaySystem()
 
             setDisplaySystem(ds);
         }
+    }
+    else
+    {
+        // if display is unspecified incorrect or specified as 'Null'
+        // setup the application in headless node.
+        setDisplaySystem(new NullDisplaySystem());
     }
 }
 
@@ -439,10 +448,10 @@ void SystemManager::setupMissionControl(const String& mode)
         else
         {
             port = boost::lexical_cast<int>(mode.substr(pos + 1));
-            host = mode.substr(1, pos - 2);
+            host = mode.substr(1, pos - 1);
         }
 
-        omsg("Initializing mission control client...");
+        ofmsg("Mission control client: connecting to %1%:%2%", %host %port);
         myMissionControlClient = MissionControlClient::create();
         myMissionControlClient->connect(host, port);
     }

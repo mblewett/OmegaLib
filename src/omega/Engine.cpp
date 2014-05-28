@@ -80,6 +80,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 Engine::Engine(ApplicationBase* app):
     //myActivePointerTimeout(2.0f),
+    myApplication(app),
     myDefaultCamera(NULL),
 	//myPointerMode(PointerModeWand)
 	myDrawPointers(false),
@@ -250,6 +251,7 @@ void Engine::initialize()
 			soundEnabled = true;
 		}
 	}
+	soundManager->setup( syscfg->getRootSetting()["config"] );
 
 	// Load input mapping
 	if(syscfg->exists("config/inputMap"))

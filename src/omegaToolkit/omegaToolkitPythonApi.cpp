@@ -245,7 +245,11 @@ BOOST_PYTHON_MODULE(omegaToolkit)
 		PYAPI_METHOD(Widget, requestLayoutRefresh)
 		PYAPI_METHOD(Widget, setRotation)
 		PYAPI_METHOD(Widget, getRotation)
-		// Navigation
+        PYAPI_METHOD(Widget, setSizeAnchorEnabled)
+        PYAPI_METHOD(Widget, isSizeAnchorEnabled)
+        PYAPI_METHOD(Widget, setSizeAnchor)
+        PYAPI_GETTER(Widget, getSizeAnchor)
+        // Navigation
 		PYAPI_METHOD(Widget, isNavigationEnabled)
 		PYAPI_METHOD(Widget, setNavigationEnabled)
 		PYAPI_METHOD(Widget, setHorizontalNextWidget)
@@ -312,7 +316,9 @@ BOOST_PYTHON_MODULE(omegaToolkit)
 		PYAPI_STATIC_REF_GETTER(Image, create)
 		PYAPI_REF_GETTER(Image, getData)
 		PYAPI_METHOD(Image, setData)
-		;
+        PYAPI_METHOD(Image, setSourceRect)
+        PYAPI_METHOD(Image, setDestRect)
+        ;
 
 	// Slider
 	PYAPI_REF_CLASS(Slider, Widget)
@@ -332,6 +338,11 @@ BOOST_PYTHON_MODULE(omegaToolkit)
 		PYAPI_METHOD(Label, setFont)
 		PYAPI_METHOD(Label, getFont)
 		;
+
+    // TextBox
+    PYAPI_REF_CLASS(TextBox, Label)
+        PYAPI_STATIC_REF_GETTER(TextBox, create)
+        ;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

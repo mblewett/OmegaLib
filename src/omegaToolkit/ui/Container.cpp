@@ -84,7 +84,7 @@ void Container::load(Setting& setting)
 {
     if(setting.exists("layout"))
     {
-        String layout = setting["layout"];
+        String layout = (const char*)setting["layout"];
         if(layout == "LayoutFree") myLayout = LayoutFree;
         if(layout == "LayoutVertical") myLayout = LayoutVertical;
         if(layout == "LayoutHorizontal") myLayout = LayoutHorizontal;
@@ -93,19 +93,19 @@ void Container::load(Setting& setting)
     }
     if(setting.exists("position"))
     {
-        String position = setting["position"];
+        String position = (const char*)setting["position"];
         setPosition(Vector2f(position[0], position[1]));
     }
     if(setting.exists("horizontalAlign"))
     {
-        String align = setting["horizontalAlign"];
+        String align = (const char*)setting["horizontalAlign"];
         if(align == "AlignLeft") myHorizontalAlign = AlignLeft;
         if(align == "AlignCenter") myHorizontalAlign = AlignCenter;
         if(align == "AlignRight") myHorizontalAlign = AlignRight;
     }
     if(setting.exists("verticalAlign"))
     {
-        String align = setting["verticalAlign"];
+        String align = (const char*)setting["verticalAlign"];
         if(align == "AlignTop") myVerticalAlign = AlignTop;
         if(align == "AlignBottom") myVerticalAlign = AlignBottom;
         if(align == "AlignMiddle") myVerticalAlign = AlignMiddle;
@@ -158,7 +158,10 @@ void Container::addChild(Widget* child)
 void Container::removeChild(Widget* child)
 {
     requestLayoutRefresh();
-    myChildren.remove(child);
+    // Do not remove tis child now. Just register it as a child to remove. 
+    // We do this since this method may be called as part of a child update:
+    // removing the child from the list directly would break iteration.
+    myChildrenToRemove.push_back(child);
     child->setContainer(NULL);
     if(child->isNavigationEnabled())  updateChildrenNavigation();
 }
@@ -227,8 +230,8 @@ void Container::updateSize()
         {
             w->updateSize();
         }
-        Widget::updateSize();
     }
+    Widget::updateSize();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -240,10 +243,16 @@ void Container::autosize()
     int maxheight = 0;
     foreach(Widget* w, myChildren)
     {
-        if(w->getWidth() > maxwidth) maxwidth = w->getWidth();
-        if(w->getHeight() > maxheight) maxheight = w->getHeight();
-        width += w->getWidth();
-        height += w->getHeight();
+        // If widget has size anchoring enabled, its size depends on this 
+        // conainer size. Do not keep into account when auto-sizing this container
+        // to avoid a circular dependency in size resolution.
+        if(!w->isSizeAnchorEnabled())
+        {
+            if(w->getWidth() > maxwidth) maxwidth = w->getWidth();
+            if(w->getHeight() > maxheight) maxheight = w->getHeight();
+            width += w->getWidth();
+            height += w->getHeight();
+        }
     }
     if(myLayout == LayoutHorizontal)
     {
@@ -269,9 +278,15 @@ void Container::autosize()
         height = 0;
         foreach(Widget* w, myChildren)
         {
-            const Vector2f& p = w->getPosition();
-            if(p[0] + w->getWidth() > width) width = p[0] + w->getWidth();
-            if(p[1] + w->getHeight() > height) height = p[1] + w->getHeight();
+            // If widget has size anchoring enabled, its size depends on this 
+            // conainer size. Do not keep into account when auto-sizing this container
+            // to avoid a circular dependency in size resolution.
+            if(!w->isSizeAnchorEnabled())
+            {
+                const Vector2f& p = w->getPosition();
+                if(p[0] + w->getWidth() > width) width = p[0] + w->getWidth();
+                if(p[1] + w->getHeight() > height) height = p[1] + w->getHeight();
+            }
         }
     }
 
@@ -514,10 +529,15 @@ void Container::layout()
 void Container::update(const omega::UpdateContext& context)
 {
     Widget::update(context);
-    foreach(Widget* w, myChildren)
+    foreach(Ref<Widget> w, myChildren)
     {
         w->update(context);
     }
+    foreach(Ref<Widget> w, myChildrenToRemove)
+    {
+        myChildren.remove(w);
+    };
+    myChildrenToRemove.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -579,7 +599,7 @@ bool Container::rayToPointerEvent(const Event& inEvt, Event& outEvt)
     }
 
     Plane plane(normal, pos);
-    std::pair<bool, float> result = Math::intersects(r, plane);
+    std::pair<bool, omicron::real> result = Math::intersects(r, plane);
     if(result.first)
     {
         // An intersection exists: find the point.

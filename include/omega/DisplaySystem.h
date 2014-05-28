@@ -1,7 +1,7 @@
 /******************************************************************************
  * THE OMEGA LIB PROJECT
  *-----------------------------------------------------------------------------
- * Copyright 2010-2013		Electronic Visualization Laboratory, 
+ * Copyright 2010-2014		Electronic Visualization Laboratory, 
  *							University of Illinois at Chicago
  * Authors:										
  *  Alessandro Febretti		febret@gmail.com
@@ -39,7 +39,6 @@
 #include "ApplicationBase.h"
 #include "Color.h"
 #include "DisplayUtils.h"
-//#include "Color.h"
 
 namespace omega
 {
@@ -52,7 +51,7 @@ class SystemManager;
 class OMEGA_API DisplaySystem: public ReferenceType
 {
 public:
-    enum DisplaySystemType { Invalid, Equalizer, Glut };
+    enum DisplaySystemType { Invalid, Equalizer, Glut, Null };
 
 public:
     virtual ~DisplaySystem() {}
@@ -96,10 +95,19 @@ public:
     const Color& getBackgroundColor() { return myBackgroundColor; }
     void setBackgroundColor(const Color& value) { myBackgroundColor = value; }
 
+    void clearColor(bool enabled) { myClearColor = enabled; }
+    bool isClearColorEnabled() { return myClearColor; }
+
+    void clearDepth(bool enabled) { myClearDepth = enabled; }
+    bool isClearDepthEnabled() { return myClearDepth; }
+
+
 protected:
 
     DisplaySystem():
-         myBackgroundColor(0.2f, 0.2f, 0.2f)
+         myBackgroundColor(0.2f, 0.2f, 0.2f),
+         myClearDepth(true),
+         myClearColor(true)
     {
         // Increase the display config reference count: this is done because 
         // DisplayConfig may be accessed by reference (for instance through the
@@ -112,6 +120,8 @@ protected:
 
 private:
     Color myBackgroundColor;
+    bool myClearDepth;
+    bool myClearColor;
 };
 
 }; // namespace omega

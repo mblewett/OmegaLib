@@ -37,6 +37,7 @@
 #include "omega/Texture.h"
 #include "omega/glheaders.h"
 #include "omega/SystemManager.h"
+#include "omega/Camera.h"
 
 #include "FTGL/ftgl.h"
 
@@ -95,10 +96,15 @@ void DrawInterface::beginDraw2D(const DrawContext& context)
     glPushMatrix();
     glLoadIdentity();
 
-	int left = context.tile->offset[0];
-    int right = left + context.viewport.width();//context.tile->pixelSize[0];
-	int top = context.tile->offset[1];
-	int bottom = top + context.viewport.height();//+ context.tile->pixelSize[1];
+    Camera* c = context.camera;
+
+	int left = context.tile->offset[0] - c->getPixelViewX();
+    //int right = left + context.viewport.width();//context.tile->pixelSize[0];
+	int top = context.tile->offset[1] - c->getPixelViewY();
+	//int bottom = top + context.viewport.height();//+ context.tile->pixelSize[1];
+
+    int right = left + context.tile->pixelSize[0];
+    int bottom = top + context.tile->pixelSize[1];
 
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
@@ -107,9 +113,9 @@ void DrawInterface::beginDraw2D(const DrawContext& context)
 
     glMatrixMode(GL_MODELVIEW);
 
-	glViewport(
-		context.viewport.x(), context.viewport.y(), 
-		context.viewport.width(), context.viewport.height());
+    glViewport(0, 0, context.tile->pixelSize[0], context.tile->pixelSize[1]);
+		//context.viewport.x(), context.viewport.y(), 
+		//context.viewport.width(), context.viewport.height());
 
 	glPushAttrib(GL_ENABLE_BIT);
 	glDisable(GL_DEPTH_TEST);
@@ -519,10 +525,21 @@ GLuint DrawInterface::makeShaderFromSource(const char* source, ShaderType Type)
 ///////////////////////////////////////////////////////////////////////////////
 GLuint DrawInterface::createProgram(GLuint vertextShader, GLuint fragmentShader)
 {
+    if(vertextShader == 0 && fragmentShader ==0)
+    {
+	return 0;
+    }
+
     GLuint program = glCreateProgram();
 
-    glAttachShader(program, vertextShader);
-    glAttachShader(program, fragmentShader);
+    if(vertextShader)
+    {
+	glAttachShader(program, vertextShader);
+    }
+    if(fragmentShader)
+    {
+	glAttachShader(program, fragmentShader);
+    }
 
     glLinkProgram(program);
 
@@ -569,8 +586,26 @@ GLuint DrawInterface::getOrCreateProgram(
 		return 0;
 	}
 
-	GLuint vs = makeShaderFromSource(vertexShaderSource.c_str(), VertexShader);
-	GLuint fs = makeShaderFromSource(fragmentShaderSource.c_str(), FragmentShader);
+	return getOrCreateProgramFromSource(name, vertexShaderSource, fragmentShaderSource);
+}
+
+GLuint DrawInterface::getOrCreateProgramFromSource(
+	const String& name, 
+	const String& vertexShaderSource, 
+	const String& fragmentShaderSource)
+{
+	if(myPrograms.find(name) != myPrograms.end()) return myPrograms[name];
+
+	GLuint vs = 0;
+	if(vertexShaderSource.size() > 0)
+	{
+		vs = makeShaderFromSource(vertexShaderSource.c_str(), VertexShader);
+	}
+	GLuint fs = 0;
+	if(fragmentShaderSource.size() > 0)
+	{
+		fs = makeShaderFromSource(fragmentShaderSource.c_str(), FragmentShader);
+	}
 	GLuint program = createProgram(vs, fs);
 	myPrograms[name] = program;
 	return program;

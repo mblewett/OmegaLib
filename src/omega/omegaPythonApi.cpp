@@ -1001,6 +1001,24 @@ public:
     }
 };
 
+///////////////////////////////////////////////////////////////////////////////
+void setClearColor(const Color& color)
+{
+    SystemManager::instance()->getDisplaySystem()->setBackgroundColor(color);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void clearColor(bool enabled)
+{
+    SystemManager::instance()->getDisplaySystem()->clearColor(enabled);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void clearDepth(bool enabled)
+{
+    SystemManager::instance()->getDisplaySystem()->clearDepth(enabled);
+}
+
 BOOST_PYTHON_FUNCTION_OVERLOADS(querySceneRayOverloads, querySceneRay, 3, 4);
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(NodeYawOverloads, yaw, 1, 2) 
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(NodePitchOverloads, pitch, 1, 2) 
@@ -1240,6 +1258,11 @@ BOOST_PYTHON_MODULE(omega)
         .def("setReadbackTarget", &CameraOutput::setReadbackTarget, CameraOutputReadbackOverloads())
         ;
 
+    PYAPI_ENUM(Camera::ViewMode, ViewMode)
+            PYAPI_ENUM_VALUE(Camera, Immersive)
+            PYAPI_ENUM_VALUE(Camera, Classic)
+         ;
+
     // Camera
     PYAPI_REF_CLASS(Camera, SceneNode)
         PYAPI_REF_GETTER(Camera, getOutput)
@@ -1268,6 +1291,8 @@ BOOST_PYTHON_MODULE(omega)
         PYAPI_GETTER(Camera, getViewPosition)
         PYAPI_METHOD(Camera, setViewSize)
         PYAPI_GETTER(Camera, getViewSize)
+        PYAPI_METHOD(Camera, setViewMode)
+        PYAPI_GETTER(Camera, getViewMode)
         PYAPI_METHOD(Camera, getCameraId)
         PYAPI_METHOD(Camera, setMask)
         PYAPI_METHOD(Camera, getMask)
@@ -1398,7 +1423,7 @@ BOOST_PYTHON_MODULE(omega)
         PYAPI_METHOD(SoundInstance, pause)
         PYAPI_METHOD(SoundInstance, stop)
         PYAPI_METHOD(SoundInstance, isPlaying)
-		PYAPI_METHOD(SoundInstance, isDone)
+        PYAPI_METHOD(SoundInstance, isDone)
         PYAPI_METHOD(SoundInstance, setLoop)
         PYAPI_METHOD(SoundInstance, getLoop)
         PYAPI_METHOD(SoundInstance, setPosition)
@@ -1538,6 +1563,10 @@ BOOST_PYTHON_MODULE(omega)
     def("quaternionToEulerDeg", quaternionToEulerDeg, PYAPI_RETURN_VALUE);
     def("quaternionFromEuler", quaternionFromEuler, PYAPI_RETURN_VALUE);
     def("quaternionFromEulerDeg", quaternionFromEulerDeg, PYAPI_RETURN_VALUE);
+
+    def("setClearColor", setClearColor);
+    def("clearColor", clearColor);
+    def("clearDepth", clearDepth);
 };
 
 // Black magic. Include the pyeuclid source code (saved as hex file using xdd -i)
@@ -1548,7 +1577,7 @@ char euclid_source[] = {
 ///////////////////////////////////////////////////////////////////////////////
 void omegaPythonApiInit()
 {
-    omsg("omegaPythonApiInit()");
+    //omsg("omegaPythonApiInit()");
     omega::PythonInterpreter* interp = SystemManager::instance()->getScriptInterpreter();
 
     // Compile, load and import the euclid module.

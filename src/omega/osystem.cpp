@@ -61,6 +61,10 @@
     #define GetCurrentDir getcwd
 #endif
 
+#ifdef OMEGA_OS_OSX
+    #include <mach-o/dyld.h>
+#endif
+
 namespace omega
 {
     ///////////////////////////////////////////////////////////////////////////
@@ -173,6 +177,11 @@ namespace omega
             bool help = false;
             bool disableSIGINTHandler = false;
             bool logRemoteNodes = false;
+
+            oargs().newOptionalString(
+                "config", 
+                "same as -c [config]",
+                configFilename);
 
             sArgs.newNamedString(
                 'c',
@@ -326,7 +335,7 @@ namespace omega
                     ofmsg("::: not found, trying %1%", %curCfgFilename);
                     if(!DataManager::findFile(curCfgFilename, path))
                     {
-                        oerror("FATAL: Could not load default.cfg. Aplication will exit now.");
+                        oerror("FATAL: Could not load default.cfg. Application will exit now.");
                         return -1;
                     }
                 }
@@ -335,6 +344,16 @@ namespace omega
             ofmsg("::: found config: %1%", %curCfgFilename);
 
             Config* cfg = new Config(curCfgFilename);
+
+            // Set the current working dir to the configuration dir
+            // so we can load local files from there during setup if needed
+            // this is used for example by the initScript option to load a script
+            // in the same dir as the config file.
+            String cfgdir;
+            String cfgbasename;
+            String cfgext;
+            StringUtils::splitFullFilename(path, cfgbasename, cfgext, cfgdir);
+            dm->addSource(new FilesystemDataSource(cfgdir));
             
             // If multiApp string is set, setup multi-application mode.
             // In multi-app mode, this instance will output to a subset of the available tiles, and will choose a
@@ -490,8 +509,10 @@ namespace omega
 #elif defined OMEGA_OS_WIN
         GetModuleFileName(NULL, path, 2048);
 #else
-        owarn("OSX NOT IMPLEMENTED: (osystem.cpp) ogetexecpath");
-        owarn("Imlement using _NSGetExecutablePath()");
+        uint32_t bufsize = 2048;
+        _NSGetExecutablePath(path, &bufsize);
+        //owarn("OSX NOT IMPLEMENTED: (osystem.cpp) ogetexecpath");
+        //owarn("Imlement using _NSGetExecutablePath()");
 #endif	
         return path;
     }

@@ -45,6 +45,7 @@
 #include "omega/GamepadCameraController.h"
 #include "omega/MouseCameraController.h"
 #include "omega/KeyboardMouseCameraController.h"
+#include "omega/glheaders.h"
 
 using namespace omega;
 
@@ -67,7 +68,13 @@ Camera::Camera(Engine* e, uint flags):
     myFarZ(1000.0f),
     myViewPosition(0, 0),
     myViewSize(1, 1),
-    myEnabled(true)
+    myReferenceViewPosition(0, 0),
+    myReferenceViewSize(1, 1),
+    myEnabled(true),
+    myViewMode(Immersive),
+    myClearColor(false), // Camera does not clear color by default, display system does.
+    myClearDepth(false), // Camera does not clear depth by default, display system does.
+    myImmersiveViewTransform(AffineTransform3::Identity())
 {
     myCustomTileConfig = new DisplayTileConfig();
     //myProjectionOffset = -Vector3f::UnitZ();
@@ -159,10 +166,18 @@ void Camera::updateTraversal(const UpdateContext& context)
     // the view transform
     //if(isUpdateNeeded())
     {
+        //Vector3f trR = myImmersiveViewTransform.translation();
+        //Matrix3f lnR = myImmersiveViewTransform.linear();
+
         // Update view transform.
         myViewTransform = Math::makeViewMatrix(
             getDerivedPosition(), // + myHeadOffset, 
             getDerivedOrientation());
+
+        AffineTransform3 t = AffineTransform3::Identity();
+        //t.translate(myImmersivePosition);
+
+        myViewTransform = myImmersiveViewTransform * myViewTransform;// *t;// .linear();
     }
     
     SceneNode::updateTraversal(context);
@@ -349,6 +364,60 @@ void Camera::finishFrame(const FrameInfo& frame)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+void Camera::clear(DrawContext& context)
+{
+    if(myClearColor || myClearDepth)
+    {
+        Vector2i canvasSize;
+        if(myCustomTileConfig->enabled)
+        {
+            context.pushTileConfig(myCustomTileConfig);
+            canvasSize = myCustomTileConfig->pixelSize;
+        }
+        else
+        {
+            const DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+            canvasSize = dcfg.canvasPixelSize;
+        }
+
+        // If camera view is not overlayed to current tile, return.
+        if(!overlapsTile(context.tile, canvasSize)) return;
+
+        // Update view bounds THEN update the viewport.
+        // updateViewport will set up the viewport for side-by-side stereo modes.
+        // Note that custom camera viewports and side-by-side stereo do not work 
+        // together yet. If side-by-side stereo is enabled, it will override camera
+        // viewport settings.
+        context.updateViewBounds(myViewPosition, myViewSize, canvasSize);
+        context.updateViewport();
+
+        glPushAttrib(GL_SCISSOR_BIT);
+        glScissor(
+            context.viewport.x(),
+            context.viewport.y(),
+            context.viewport.width(),
+            context.viewport.height());
+
+        if(myClearColor)
+        {
+            // clear the depth and color buffers.
+            const Color& b = myBackgroundColor;
+            glClearColor(b[0], b[1], b[2], b[3]);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+        if(myClearDepth)
+        {
+            glClear(GL_DEPTH_BUFFER_BIT);
+        }
+        if(myCustomTileConfig->enabled)
+        {
+            context.popTileConfig();
+        }
+        glPopAttrib();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 Vector3f Camera::localToWorldPosition(const Vector3f& position)
 {
     Vector3f res = mPosition + mOrientation * position;
@@ -382,4 +451,96 @@ void Camera::setController(CameraController* value)
         myController->setCamera(this);
         ModuleServices::addModule(myController);
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+int Camera::getPixelViewX()
+{
+    DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+    return myViewPosition[0] * dcfg.canvasPixelSize[0];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+int Camera::getPixelViewY()
+{
+    DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+    return myViewPosition[1] * dcfg.canvasPixelSize[1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+int Camera::getPixelViewWidth()
+{
+    DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+    return myViewSize[0] * dcfg.canvasPixelSize[0];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+int Camera::getPixelViewHeight()
+{
+    DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+    return myViewSize[1] * dcfg.canvasPixelSize[1];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Utility function, add 3D point corresponding to specified normalized
+// view position to a vector.
+bool addViewPointToVector(DisplayConfig& dcfg, float x, float y, Vector<Vector3f>& points)
+{
+    if(x < 0) x = 0;
+    if(y < 0) y = 0;
+    if(x > 1) x = 1;
+    if(y > 1) y = 1;
+
+    // Get the 3D coordinates of the view corners
+    x *= dcfg.canvasPixelSize[0];
+    y *= dcfg.canvasPixelSize[1];
+
+    // normalized point (1,1) is valid but pixel conversion will be out of tile
+    // bounds. This is a bit of a hack but it works, remove a single pixel from position
+    if(x > 0) x--;
+    if(y > 0) y--;
+
+    std::pair<bool, Vector3f> p = dcfg.getPixelPosition(x, y);
+    if(p.first)
+    {
+        points.push_back(p.second);
+    }
+    else
+    {
+        ofwarn("Camera::addViewPointToVector: cannot convert point %1% %2%", %x %y);
+    }
+    return p.first;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void Camera::updateImmersiveViewTransform()
+{
+    DisplayConfig& dcfg = getEngine()->getDisplaySystem()->getDisplayConfig();
+
+    Vector<Vector3f> originals;
+    Vector<Vector3f> modified;
+
+    addViewPointToVector(dcfg, myReferenceViewPosition[0], myReferenceViewPosition[1], originals);
+    addViewPointToVector(dcfg, myReferenceViewPosition[0], myReferenceViewPosition[1] + myReferenceViewSize[1], originals);
+    addViewPointToVector(dcfg, myReferenceViewPosition[0] + myReferenceViewSize[0], myReferenceViewPosition[1], originals);
+    addViewPointToVector(dcfg, myReferenceViewPosition[0] + myReferenceViewSize[0], myReferenceViewPosition[1] + myReferenceViewSize[1], originals);
+    addViewPointToVector(dcfg, myReferenceViewPosition[0] + myReferenceViewSize[0] * 0.5f, myReferenceViewPosition[1] + myReferenceViewSize[1] * 0.5f, originals);
+
+    addViewPointToVector(dcfg, myViewPosition[0], myViewPosition[1], modified);
+    addViewPointToVector(dcfg, myViewPosition[0], myViewPosition[1] + myViewSize[1], modified);
+    addViewPointToVector(dcfg, myViewPosition[0] + myViewSize[0], myViewPosition[1], modified);
+    addViewPointToVector(dcfg, myViewPosition[0] + myViewSize[0], myViewPosition[1] + myViewSize[1], modified);
+    addViewPointToVector(dcfg, myViewPosition[0] + myViewSize[0] * 0.5f, myViewPosition[1] + myViewSize[1] * 0.5f, modified);
+
+    Vectors3f src;
+    Vectors3f dst;
+    src.resize(3, originals.size());
+    dst.resize(3, modified.size());
+    for(int i = 0; i < originals.size(); i++)
+    {
+        src.col(i) = originals[i];
+        dst.col(i) = modified[i];
+    }
+
+    myImmersiveViewTransform = Math::computeMatchingPointsTransform(src, dst);
 }

@@ -127,7 +127,10 @@ namespace omega
 		virtual void updateSharedData(SharedIStream& in);
 
 		//String getHelpString(const String& filter);
-	protected:
+        void lockInterpreter();
+        void unlockInterpreter();
+
+    protected:
 		struct QueuedCommand
 		{
 			QueuedCommand(const String& cmd, bool bneedsExecute, bool bneedsSend):
@@ -145,7 +148,9 @@ namespace omega
 		// Command read from a configuration file and executed during 
 		// initialization. Helpful to load or setup optional modules.
 		String myInitCommand;
-		PythonInteractiveThread* myInteractiveThread;
+        String myInitScript;
+
+        PythonInteractiveThread* myInteractiveThread;
 
 		Lock myInteractiveCommandLock;
 		List<QueuedCommand*> myCommandQueue;
@@ -163,10 +168,6 @@ namespace omega
 		// Stats
 		Ref<Stat> myUpdateTimeStat;
 
-
-	private:
-		void lockInterpreter();
-		void unlockInterpreter();
 
 	private:
 		static const Event* mysLastEvent;

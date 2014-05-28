@@ -33,6 +33,7 @@ SET( srcs
 		MouseService.cpp
 		MissionControl.cpp
 		Node.cpp
+		NullDisplaySystem.cpp
 		ObserverUpdateServiceExt.cpp
         osystem.cpp
 		PixelData.cpp
@@ -91,6 +92,7 @@ SET( headers
 		${OmegaLib_SOURCE_DIR}/include/omega/ModuleServices.h
 		${OmegaLib_SOURCE_DIR}/include/omega/MouseService.h
 		${OmegaLib_SOURCE_DIR}/include/omega/Node.h
+		${OmegaLib_SOURCE_DIR}/include/omega/NullDisplaySystem.h
 		${OmegaLib_SOURCE_DIR}/include/omega/ObserverUpdateServiceExt.h
 		${OmegaLib_SOURCE_DIR}/include/omega/osystem.h
         ${OmegaLib_SOURCE_DIR}/include/omega/otypes.h
@@ -157,7 +159,11 @@ if(OMEGA_USE_DISPLAY_EQUALIZER)
 	include_directories(${EQUALIZER_INCLUDES})
 	
 	if(APPLE)
-		include_directories(SYSTEM /usr/X11R6/include)
+        if(${CURRENT_OSX_VERSION} STREQUAL "10.9")
+            include_directories(SYSTEM /opt/X11/include)
+        else()
+            include_directories(SYSTEM /usr/X11R6/include)
+        endif()
 	endif()
 
 	set( srcs ${srcs} 
